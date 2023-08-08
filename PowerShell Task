@@ -1,0 +1,53 @@
+# Parameters
+$Username = Read-Host "Enter username"
+$Email = Read-Host "Enter email address"
+$Department = Read-Host "Enter department"
+$JobTitle = Read-Host "Enter job title"
+
+# Validate input parameters
+if ([string]::IsNullOrWhiteSpace($Username) -or [string]::IsNullOrWhiteSpace($Email) -or
+    [string]::IsNullOrWhiteSpace($Department) -or [string]::IsNullOrWhiteSpace($JobTitle)) {
+    Write-Host "Invalid input parameters. Please provide all required information."
+    exit
+}
+
+# Check if the user account already exists
+if (Get-ADUser -Filter {SamAccountName -eq $Username}) {
+    Write-Host "User account '$Username' already exists."
+    exit
+}
+
+# Generate a random secure password
+$Password = ConvertTo-SecureString -AsPlainText (Get-RandomPassword) -Force
+
+# Create user account
+New-ADUser -Name $Username -SamAccountName $Username -UserPrincipalName "$Username@example.com" -EmailAddress $Email `
+    -Department $Department -Title $JobTitle -AccountPassword $Password -Enabled $true
+
+# Add user to appropriate groups based on department and job title
+if ($Department -eq "IT") {
+    Add-ADGroupMember -Identity "IT Group" -Members $Username
+}
+# Add more conditions and group memberships as needed
+
+# Email the user's password
+Send-MailMessage -From "admin@example.com" -To $Email -Subject "Your New Account Information" `
+    -Body "Username: $Username`r`nPassword: $($Password | ConvertFrom-SecureString)`
+
+# Log actions to a centralized log file
+$LogEntry = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') - Account Created: $Username ($Email) - Department: $Department - Job Title: $JobTitle"
+Add-Content -Path "C:\Path\To\Log\File.txt" -Value $LogEntry
+
+# Function to generate a random password
+function Get-RandomPassword {
+    $length = 12
+    $validCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?`"
+    $random = New-Object System.Random
+    $password = [System.Text.StringBuilder]::new()
+    
+    for ($i = 0; $i -lt $length; $i++) {
+        $password.Append($validCharacters[$random.Next(0, $validCharacters.Length)])
+    }
+    
+    return $password.ToString()
+}
